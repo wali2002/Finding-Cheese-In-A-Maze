@@ -1,0 +1,256 @@
+*** EVALUATION ***
+ANSI-C/cC++ Compiler for HC12 V-5.0.38 Build 9056, Feb 26 2009
+
+    1:  /*****************************************************
+    2:    Demo files: Terminal port definition
+    3:   ----------------------------------------------------
+    4:     Copyright (c) Metrowerks, Basel, Switzerland
+    5:                 All rights reserved
+    6:                    Do not modify!
+    7:   *****************************************************/
+    8:  
+    9:  /************************************************************************
+   10:     This example shows how to access a virtual on chip IO.
+   11:     Calls for terminal output is done via on chip SCI.
+   12:  **************************************************************************/
+   13:  
+   14:  #include <hidef.h>
+   15:  #include <termio.h>
+   16:  
+   17:  #ifdef __ELF_OBJECT_FILE_FORMAT__
+   18:    #define HIWAVE  1  /* only HI-WAVE can handle ELF/Dwarf object files */
+   19:  #elif defined(__H8_500__)
+   20:    #define HIWAVE  0  /* H8/500 simulator not available in HI-WAVE yet */
+   21:  #elif defined(__MWERKS__) && !defined(__HIWARE__)
+   22:    #define HIWAVE  0  /* LT not applicable for CW */
+   23:  #else
+   24:    #define HIWAVE  1  /* set to one for HI-WAVE, to zero for HI-CROSS Simulators/Debuggers */
+   25:  #endif
+   26:  
+   27:  #if defined(__HC16__) && (defined(__SMALL__) || defined(__MEDIUM__))
+   28:    /* NOTE: For the HC16 CPU, this module must be compiled with command line
+   29:             option "-Cp0" telling the compiler that the data page will be page 0,
+   30:             thus enabling it to generate efficient access code for the on-chip
+   31:             I/O. */
+   32:    #pragma OPTION ADD "-Cp0"
+   33:  #endif
+   34:  
+   35:  /* if the testterm.wnd terminal emulation is used. Currently only the HC12 supports
+   36:     the on-chip terminal emulation (terminal.wnd) with HI-WAVE */
+   37:  #define TEST_TERM   ((HIWAVE && (!defined(__HC12__)) && (!defined(__XGATE__))  && (!defined(__ST7__)) && (!defined(__XA__))) || defined(__HC11__))
+   38:  
+   39:  #if !(defined(__MWERKS__) && !defined(__HIWARE__)) /* LT not applicable for CW */
+   40:  typedef volatile struct {
+   41:    #if TEST_TERM
+   42:      unsigned char BAUD;
+   43:      unsigned char SCCR1;
+   44:      unsigned char SCCR2;
+   45:      unsigned char SCSR;
+   46:      unsigned char SCDR;
+   47:    #elif defined(__HC12__) || defined(__XGATE__)
+   48:      unsigned char SCxBDH;
+   49:      unsigned char SCxBDL;
+   50:      unsigned char SCxCR1;
+   51:      unsigned char SCxCR2;
+   52:      unsigned char SCxSR1;
+   53:      unsigned char SCxSR2;
+   54:      unsigned char SCxDRH;
+   55:      unsigned char SCxDRL;
+   56:    #elif (defined(__HC16__) || defined(__M68K__))
+   57:      unsigned int SCCR0;
+   58:      unsigned int SCCR1;
+   59:      unsigned int SCSR;
+   60:      unsigned int SCDR;
+   61:    #elif defined(__H8_500__)  /* H8/532 serial communication unit */
+   62:      unsigned char SMR;    /* Serial Mode Register   */
+   63:      unsigned char BRR;    /* Bit Rate Register      */
+   64:      unsigned char SCR;    /* Serial Control Register*/
+   65:      unsigned char TxBuf;  /* Transmit Data Register */
+   66:      unsigned char SSR;    /* Serial Status Register */    
+   67:      unsigned char RxBuf;  /* Receive Data Register  */
+   68:    #elif defined(__XA__)  
+   69:      unsigned char S0CON;  
+   70:      unsigned char S0STAT; 
+   71:      unsigned char _filler[62];
+   72:      unsigned char S0BUF;
+   73:    #elif defined(__ST7__)
+   74:      unsigned char SCISR; 
+   75:      unsigned char SCIDR; 
+   76:      unsigned char SCIBRR;
+   77:      unsigned char SCICR1;
+   78:      unsigned char SCICR2;  
+   79:    #else
+   80:      #error "unknown architecture"
+   81:    #endif
+   82:  } SCIStruct;
+   83:  #endif /* #if !(defined(__MWERKS__) && !defined(__HIWARE__)) */
+   84:  
+   85:  #if defined(__HCS12__) || defined(_HCS12) || defined(__XGATE__)
+   86:    #define SCI_ADDR 0x00c8
+   87:  #elif defined(__XA__)
+   88:    #define SCI_ADDR 0x420  
+   89:  #elif defined(__HC12__)
+   90:    #define SCI_ADDR 0x00c0
+   91:  #elif defined(__ST7__)
+   92:    #define SCI_ADDR 0x0050
+   93:  #else
+   94:    #if HIWAVE
+   95:      /* testterm.wnd */
+   96:      #define SCI_ADDR 0x200
+   97:    #else
+   98:      #if defined(__HC11__)
+   99:        #define SCI_ADDR 0x102B
+  100:      #elif defined(__HC16__)
+  101:        #define SCI_ADDR 0xFFC08
+  102:      #elif defined(__M68K__)
+  103:        #define SCI_ADDR 0xFFFC08
+  104:      #elif defined(__H8_500__)
+  105:        #define SCI_ADDR 0xFFD8
+  106:      #endif
+  107:    #endif
+  108:    #endif
+  109:  
+  110:  #if 1 || __STDC__  /* ANSI does not allow the '@' */
+  111:    #if defined(__HC05__) || defined(__HC08__) || defined(__ST7__) || defined(__ST19X__)
+  112:      #define  SCI (*((volatile SCIStruct* __far)(SCI_ADDR)))
+  113:    #elif defined(__RS08__)
+  114:      #define  SCI (*((volatile SCIStruct* __paged)(CONVERT_TO_PAGED(SCI_ADDR))))
+  115:    #else
+  116:      #define  SCI (*((volatile SCIStruct*)(SCI_ADDR))) 
+  117:    #endif
+  118:  #else  /* use the language extension '@': easier debugging! */
+  119:    #ifdef __XA__
+  120:      #pragma DATA_SEG DIRECT sfr
+  121:    #endif
+  122:    SCIStruct SCI @SCI_ADDR;
+  123:    #ifdef __XA__
+  124:      #pragma DATA_SEG DEFAULT
+  125:    #endif  
+  126:  #endif
+  127:  
+  128:  char TERMIO_GetChar(void) {
+*** EVALUATION ***
+
+Function: TERMIO_GetChar
+Source  : C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src\termio.c
+Options : -CPUHCS12 -D__NO_FLOAT__ -Env"GENPATH=H:\Sem6\Mouse\XXXIII squares;H:\Sem6\Mouse\XXXIII squares\bin;H:\Sem6\Mouse\XXXIII squares\prm;H:\Sem6\Mouse\XXXIII squares\cmd;H:\Sem6\Mouse\XXXIII squares\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=H:\Sem6\Mouse\XXXIII squares\bin" -Env"TEXTPATH=H:\Sem6\Mouse\XXXIII squares\bin" -Lasm=%n.lst -Ms -ObjN="H:\Sem6\Mouse\XXXIII squares\Post_Bench_Test_Data\Standard\ObjectCode\termio.c.o"
+
+  129:    /* receives character from the terminal channel */
+  130:    #if TEST_TERM
+  131:      while (!(SCI.SCSR & 0x20)){}; /* wait for input */
+  132:      /* NOTE: when using simulator you may want to open the 'TestTerm' component */
+  133:      return SCI.SCDR; 
+  134:    #elif defined(__HC12__) || defined(__XGATE__)
+  135:      while (!(SCI.SCxSR1 & 0x20)){}; /* wait for input */
+  0000 4fcc20fc     [4]     BRCLR 204,#32,*+0 ;abs = 0000
+  136:      /* NOTE: when using simulator you may want to open the 'Terminal' component */
+  137:      return SCI.SCxDRL;
+  0004 d6cf         [3]     LDAB  207
+  138:    #elif defined(__ST7__)
+  139:      while ((SCI.SCISR & 0x20) == 0){}; /* wait for input */
+  140:      /* NOTE: when using simulator you may want to open the 'Terminal' component */
+  141:      return SCI.SCIDR;
+  142:    #elif (defined(__HC16__) || defined(__M68K__))
+  143:      while (!(SCI.SCSR & 0x40)){}; /* wait for input */
+  144:      return SCI.SCDR;
+  145:    #elif defined(__H8_500__)
+  146:      char ch;
+  147:    
+  148:      while (!(SCI.SSR & 0x40)) {}; /* wait for receive data register full */
+  149:      ch = SCI.RxBuf;
+  150:      SCI.SSR &= 0xBF;  /* clear RDRF bit */
+  151:      return ch;
+  152:    #elif defined(__XA__)
+  153:      while (!(SCI.S0CON & 0x01)){}; /* wait for input */
+  154:      SCI.S0CON &= 0xFE;
+  155:      return SCI.S0BUF;     
+  156:    #elif defined(__MWERKS__) && !defined(__HIWARE__) /* LT not applicable for CW */
+  157:    #else
+  158:      #error "unknown architecture"
+  159:    #endif
+  160:  }
+  0006 3d           [5]     RTS   
+  161:  
+  162:  void TERMIO_PutChar(char ch) {
+*** EVALUATION ***
+
+Function: TERMIO_PutChar
+Source  : C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src\termio.c
+Options : -CPUHCS12 -D__NO_FLOAT__ -Env"GENPATH=H:\Sem6\Mouse\XXXIII squares;H:\Sem6\Mouse\XXXIII squares\bin;H:\Sem6\Mouse\XXXIII squares\prm;H:\Sem6\Mouse\XXXIII squares\cmd;H:\Sem6\Mouse\XXXIII squares\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=H:\Sem6\Mouse\XXXIII squares\bin" -Env"TEXTPATH=H:\Sem6\Mouse\XXXIII squares\bin" -Lasm=%n.lst -Ms -ObjN="H:\Sem6\Mouse\XXXIII squares\Post_Bench_Test_Data\Standard\ObjectCode\termio.c.o"
+
+  0000 37           [2]     PSHB  
+  163:    /* sends a character to the terminal channel */
+  164:    #if TEST_TERM
+  165:      while (!(SCI.SCSR & 0x80)) {};    /* wait for output buffer empty */
+  166:      SCI.SCDR = ch;
+  167:    #elif defined(__HC12__) || defined(__XGATE__)
+  168:      while (!(SCI.SCxSR1 & 0x80)) {};  /* wait for output buffer empty */
+  0001 4fcc80fc     [4]     BRCLR 204,#128,*+0 ;abs = 0001
+  169:      SCI.SCxDRL = ch;
+  0005 33           [3]     PULB  
+  0006 5bcf         [2]     STAB  207
+  170:    #elif defined(__ST7__)
+  171:      while ((SCI.SCISR & 0x80) == 0) {};  /* wait for output buffer empty */
+  172:      SCI.SCIDR = ch;
+  173:    #elif (defined(__HC16__) || defined(__M68K__))
+  174:      while (!(SCI.SCSR & 0x100)) {};    /* wait for output buffer empty */ 
+  175:      SCI.SCDR = ch;
+  176:    #elif defined(__H8_500__)  
+  177:      while (!(SCI.SSR & 0x80)) {}; /* wait for transmit data register empty */
+  178:      SCI.TxBuf = ch;
+  179:      SCI.SSR &= 0x7F;  /* clear TDRE bit */
+  180:    #elif defined(__XA__)  
+  181:      while (!(SCI.S0CON & 0x02)) {};  /* wait for output buffer empty */
+  182:      SCI.S0CON &= 0xFD;     
+  183:      SCI.S0BUF = ch;     
+  184:    #elif defined(__MWERKS__) && !defined(__HIWARE__)  /* LT not applicable for CW */
+  185:    #else
+  186:      #error "unknown architecture"
+  187:    #endif
+  188:  }
+  0008 3d           [5]     RTS   
+  189:  
+  190:  void TERMIO_Init(void) {
+*** EVALUATION ***
+
+Function: TERMIO_Init
+Source  : C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src\termio.c
+Options : -CPUHCS12 -D__NO_FLOAT__ -Env"GENPATH=H:\Sem6\Mouse\XXXIII squares;H:\Sem6\Mouse\XXXIII squares\bin;H:\Sem6\Mouse\XXXIII squares\prm;H:\Sem6\Mouse\XXXIII squares\cmd;H:\Sem6\Mouse\XXXIII squares\Sources;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\lib;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\src;C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"LIBPATH=C:\Program Files\Freescale\CodeWarrior for S12(X) V5.0\lib\HC12c\include" -Env"OBJPATH=H:\Sem6\Mouse\XXXIII squares\bin" -Env"TEXTPATH=H:\Sem6\Mouse\XXXIII squares\bin" -Lasm=%n.lst -Ms -ObjN="H:\Sem6\Mouse\XXXIII squares\Post_Bench_Test_Data\Standard\ObjectCode\termio.c.o"
+
+  191:    /* initializes the communication channel */ 
+  192:    #if TEST_TERM
+  193:      SCI.BAUD  = 0x30;     /* baud rate 9600 at 8 MHz */
+  194:      SCI.SCCR2 = 0x0C;     /* 8 bit, TE and RE set */
+  195:      SCI.SCSR |= 0x80;     /* output buffer empty */
+  196:    #elif defined(__HC12__) || defined(__XGATE__)
+  197:      #if 0
+  198:        SCI.SCxBDL  =   52;   /* baud rate 9600 at 8 MHz */
+  199:      #else   
+  200:        SCI.SCxBDL  =   1;    /* for the simulator we use this small divisor to speed up the output. On hardware please use the real value. */
+  0000 cc0c01       [2]     LDD   #3073
+  0003 5bc9         [2]     STAB  201
+  201:      #endif   
+  202:      SCI.SCxCR2 = 0x0C;    /* 8 bit, TE and RE set */   
+  0005 5acb         [2]     STAA  203
+  203:    #elif defined(__ST7__)
+  204:      SCI.SCIBRR= 0b11001001; /* Set Baudrate */
+  205:      SCI.SCICR2= 0b00001100; /* TE: Transmitter Enabled + RE: Receiver Enabled */
+  206:    #elif (defined(__HC16__) || defined(__M68K__))
+  207:      SCI.SCCR0 = 55;       /**** Select baud rate 9600 */
+  208:      SCI.SCCR1 = 0x000C;   /**** 8 bit, TE and RE set */
+  209:    #elif defined(__H8_500__)
+  210:      SCI.SMR = 8;    /* 00001000: 8 bits per character, no parity, 2 stop bit, access to buffer and IER */
+  211:      SCI.BRR = 32;   /* Baud rate 9600 */
+  212:      SCI.SCR = 0x30; /* 00110000: disable Tx and Rx interrupt */
+  213:    #elif defined(__XA__)
+  214:      SCI.S0CON  = 0x12; /* UART0 mode 0 (shift register): Baud rate = osc / 16 ; reception enabled */
+  215:      SCI.S0STAT = 0x00; /* NB: XA SFRs IO simulation simulates only this mode. */
+  216:    #elif defined(__MWERKS__) && !defined(__HIWARE__)  /* LT not applicable for CW */
+  217:    #else
+  218:      #error "unknown architecture"
+  219:    #endif
+  220:  }
+  0007 3d           [5]     RTS   
+  221:  
+  222:  
+  223:  
